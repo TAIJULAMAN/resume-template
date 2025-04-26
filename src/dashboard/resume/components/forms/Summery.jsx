@@ -6,93 +6,132 @@ import { useParams } from 'react-router-dom';
 import GlobalApi from './../../../../../service/GlobalApi';
 import { Brain, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { AIChatSession } from './../../../../../service/AIModal';
+import { AIService } from './../../../../../service/ai';
 
-const prompt="Job Title: {jobTitle} , Depends on job title give me list of  summery for 3 experience level, Mid Level and Freasher level in 3 -4 lines in array format, With summery and experience_level Field in JSON Format"
-function Summery({enabledNext}) {
-    const {resumeInfo,setResumeInfo}=useContext(ResumeInfoContext);
-    const [summery,setSummery]=useState();
-    const [loading,setLoading]=useState(false);
-    const params=useParams();
-    const [aiGeneratedSummeryList,setAiGenerateSummeryList]=useState();
-    useEffect(()=>{
-        summery&&setResumeInfo({
-            ...resumeInfo,
-            summery:summery
-        })
-    },[summery])
+function Summary({enabledNext}) {
+    const {resumeInfo, setResumeInfo} = useContext(ResumeInfoContext);
+    const [summary, setSummary] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
+    const params = useParams();
 
-    const GenerateSummeryFromAI=async()=>{
-        setLoading(true)
-        const PROMPT=prompt.replace('{jobTitle}',resumeInfo?.jobTitle);
-        console.log(PROMPT);
-        const result=await AIChatSession.sendMessage(PROMPT);
-        console.log(JSON.parse(result.response.text()))
-       
-        setAiGenerateSummeryList(JSON.parse(result.response.text()))
-        setLoading(false);
-    }
-
-    const onSave=(e)=>{
-        e.preventDefault();
-       
-        setLoading(true)
-        const data={
-            data:{
-                summery:summery
-            }
+    useEffect(() => {
+        if (resumeInfo?.summary) {
+            setSummary(resumeInfo.summary);
         }
-        GlobalApi.UpdateResumeDetail(params?.resumeId,data).then(resp=>{
-            console.log(resp);
-            enabledNext(true);
-            setLoading(false);
-            toast("Details updated")
-        },(error)=>{
-            setLoading(false);
-        })
-    }
-    return (
-    <div>
-         <div className='p-5 shadow-lg rounded-lg border-t-primary border-t-4 mt-10'>
-        <h2 className='font-bold text-lg'>Summery</h2>
-        <p>Add Summery for your job title</p>
+    }, [resumeInfo]);
 
-        <form className='mt-7' onSubmit={onSave}>
-            <div className='flex justify-between items-end'>
-                <label>Add Summery</label>
-                <Button variant="outline" onClick={()=>GenerateSummeryFromAI()} 
-                type="button" size="sm" className="border-primary text-primary flex gap-2"> 
-                <Brain className='h-4 w-4' />  Generate from AI</Button>
-            </div>
-            <Textarea className="mt-5" required
-            value={summery}
-                defaultValue={summery?summery:resumeInfo?.summery}
-            onChange={(e)=>setSummery(e.target.value)}
-            />
-            <div className='mt-2 flex justify-end'>
-            <Button type="submit"
-                disabled={loading}>
-                    {loading?<LoaderCircle className='animate-spin' />:'Save'}
-                    </Button>
-            </div>
-        </form>
-        </div>
+    const generateSummaryFromAI = async (level = 'mid') => {
+        if (!resumeInfo?.jobTitle) {
+            toast.error('Please enter a job title first');
+            return;
+        }
 
+        setAiLoading(true);
+        try {
+            // Create a mock experience entry based on the job title and level
+            const mockExperience = [{
+                title: resumeInfo.jobTitle,
+                company: "Previous Company",
+                description: `${level === 'entry' ? 'Entry-level' : 'Experienced'} professional with strong foundation in ${resumeInfo.jobTitle} role.`
+            }];
+
+            // Use some default skills based on the job title
+            const defaultSkills = ['Communication', 'Problem Solving', 'Team Collaboration', resumeInfo.jobTitle + ' fundamentals'];
+
+            const generatedSummary = await AIService.generateSummary(mockExperience, defaultSkills);
+            
+            setSummary(generatedSummary);
+            setResumeInfo(prev => ({
+                ...prev,
+                summary: generatedSummary
+            }));
+            toast.success('Summary generated successfully');
+        } catch (error) {
+            console.error('Error generating summary:', error);
+            if (error.message.includes('API key')) {
+                toast.error('Please configure your OpenAI API key in the .env file');
+            } else {
+                toast.error('Failed to generate summary. Please try again.');
+            }
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const onSave = async (e) => {
+        e.preventDefault();
+        setLoading(true);
         
-       {aiGeneratedSummeryList&& <div className='my-5'>
-            <h2 className='font-bold text-lg'>Suggestions</h2>
-            {aiGeneratedSummeryList?.map((item,index)=>(
-                <div key={index} 
-                onClick={()=>setSummery(item?.summary)}
-                className='p-5 shadow-lg my-4 rounded-lg cursor-pointer'>
-                    <h2 className='font-bold my-1 text-primary'>Level: {item?.experience_level}</h2>
-                    <p>{item?.summary}</p>
-                </div>
-            ))}
-        </div>}
+        try {
+            await GlobalApi.UpdateResumeDetail(params?.resumeId, {
+                summary: summary
+            });
+            enabledNext(true);
+            toast.success('Summary updated successfully');
+        } catch (error) {
+            console.error('Error updating summary:', error);
+            toast.error('Failed to update summary');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    </div>
-  )
+    const handleInputChange = (e) => {
+        const value = e.target.value;
+        setSummary(value);
+        setResumeInfo(prev => ({
+            ...prev,
+            summary: value
+        }));
+        enabledNext(false);
+    };
+
+    return (
+        <div className='p-5 shadow-lg rounded-lg border-t-primary border-t-4 mt-10'>
+            <div className='flex justify-between items-center'>
+                <div>
+                    <h2 className='font-bold text-lg'>Professional Summary</h2>
+                    <p>Write a brief summary of your professional background</p>
+                </div>
+                <div className='flex gap-2'>
+                    <Button
+                        variant="outline"
+                        onClick={() => generateSummaryFromAI('entry')}
+                        disabled={aiLoading}
+                    >
+                        {aiLoading ? <LoaderCircle className='animate-spin mr-2' /> : <Brain className='mr-2' />}
+                        Entry Level
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => generateSummaryFromAI('mid')}
+                        disabled={aiLoading}
+                    >
+                        {aiLoading ? <LoaderCircle className='animate-spin mr-2' /> : <Brain className='mr-2' />}
+                        Mid Level
+                    </Button>
+                </div>
+            </div>
+
+            <form onSubmit={onSave} className='mt-5'>
+                <Textarea
+                    placeholder="Write your professional summary here..."
+                    value={summary}
+                    onChange={handleInputChange}
+                    className='min-h-[200px]'
+                />
+                <div className='mt-5 flex justify-end'>
+                    <Button
+                        type="submit"
+                        disabled={loading || !summary}
+                    >
+                        {loading ? <LoaderCircle className='animate-spin mr-2' /> : 'Save & Continue'}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    );
 }
 
-export default Summery
+export default Summary;
