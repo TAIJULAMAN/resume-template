@@ -8,24 +8,27 @@ import { toast } from 'sonner';
 
 const PROMPT = 'position title: {positionTitle} , Depends on position title give me 5-7 bullet points for my experience in resume (Please do not add experience level and No JSON array) , give me result in HTML tags';
 
-function RichTextEditor({ onChange, index, defaultValue }) {
+function RichTextEditor({ onChange, index, defaultValue, experienceTitle }) {
     const [value, setValue] = useState(defaultValue || '');
     const { resumeInfo } = useContext(ResumeInfoContext);
     const [loading, setLoading] = useState(false);
 
     const generateSummaryFromAI = async () => {
-        if (!resumeInfo?.Experience[index]?.title) {
+        const title = experienceTitle || resumeInfo?.Experience?.[index]?.title;
+        
+        if (!title) {
             toast.error('Please add a job title first');
             return;
         }
 
         setLoading(true);
         try {
-            const prompt = PROMPT.replace('{positionTitle}', resumeInfo.Experience[index].title);
+            const prompt = PROMPT.replace('{positionTitle}', title);
             const result = await AIChatSession.sendMessage(prompt);
-            const generatedContent = result.response.text();
-            setValue(generatedContent.replace('[', '').replace(']', ''));
-            onChange?.({ target: { value: generatedContent.replace('[', '').replace(']', '') } });
+            const generatedContent = await result.response.text();
+            const cleanContent = generatedContent.replace('[', '').replace(']', '');
+            setValue(cleanContent);
+            onChange?.({ target: { value: cleanContent } });
             toast.success('Content generated successfully');
         } catch (error) {
             console.error('Error generating content:', error);
