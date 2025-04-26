@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import FormSection from '../../components/FormSection'
 import ResumePreview from '../../components/ResumePreview'
@@ -14,10 +14,14 @@ function EditResume() {
     const navigate = useNavigate();
     const [resumeInfo, setResumeInfo] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [saveTimeout, setSaveTimeout] = useState(null);
     const previewRef = React.useRef(null);
 
     useEffect(() => {
         getResumeInfo();
+        return () => {
+            if (saveTimeout) clearTimeout(saveTimeout);
+        };
     }, [resumeId]);
 
     const getResumeInfo = () => {
@@ -43,17 +47,35 @@ function EditResume() {
         }
     };
 
-    const handleSave = async (updatedInfo) => {
-        try {
-            const updatedResume = { ...resumeInfo, ...updatedInfo, updatedAt: new Date().toISOString() };
-            GlobalApi.UpdateResumeDetail(resumeId, updatedResume);
-            localStorage.setItem(`resume-${resumeId}`, JSON.stringify(updatedResume));
-            toast.success('Changes saved successfully');
-        } catch (error) {
-            console.error('Error saving resume:', error);
-            toast.error('Failed to save changes');
-        }
-    };
+    const handleSave = useCallback(async (updatedInfo) => {
+        // Clear any pending save timeouts
+        if (saveTimeout) clearTimeout(saveTimeout);
+
+        // Update state immediately for responsive UI
+        setResumeInfo(prevInfo => ({ ...prevInfo, ...updatedInfo }));
+
+        // Debounce the save operation
+        const timeoutId = setTimeout(async () => {
+            try {
+                const finalUpdatedResume = {
+                    ...resumeInfo,
+                    ...updatedInfo,
+                    updatedAt: new Date().toISOString()
+                };
+
+                // Save to localStorage first (faster)
+                localStorage.setItem(`resume-${resumeId}`, JSON.stringify(finalUpdatedResume));
+
+                // Then update via API
+                await GlobalApi.UpdateResumeDetail(resumeId, finalUpdatedResume);
+            } catch (error) {
+                console.error('Error saving resume:', error);
+                toast.error('Failed to save changes');
+            }
+        }, 1000); // Debounce for 1 second
+
+        setSaveTimeout(timeoutId);
+    }, [resumeId, resumeInfo, saveTimeout]);
 
     const handleExport = async () => {
         if (!previewRef.current) return;
@@ -83,9 +105,7 @@ function EditResume() {
                     </Button>
                 </div>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-10'>
-                    {/* Form Section */}
                     <FormSection />
-                    {/* Preview Section */}
                     <div ref={previewRef}>
                         <ResumePreview />
                     </div>

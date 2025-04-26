@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { v4 as uuidv4 } from 'uuid';
 import GlobalApi from './../../../service/GlobalApi'
 import { useNavigate } from 'react-router-dom'
 
@@ -22,12 +21,8 @@ function AddResume() {
 
     const onCreate = async () => {
         setLoading(true)
-        const uuid = uuidv4();
         const data = {
-            id: uuid,
             title: resumeTitle,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
             content: {
                 personalDetails: {},
                 experience: [],
@@ -38,9 +33,9 @@ function AddResume() {
         };
 
         try {
-            GlobalApi.CreateNewResume(data);
+            const newResume = await GlobalApi.CreateNewResume(data);
             setLoading(false);
-            navigation('/dashboard/resume/' + uuid + "/edit");
+            navigation('/dashboard/resume/' + newResume.id + "/edit");
         } catch (error) {
             console.error('Error creating resume:', error);
             setLoading(false);
