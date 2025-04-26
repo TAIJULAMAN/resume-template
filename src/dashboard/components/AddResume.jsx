@@ -43,7 +43,7 @@ function AddResume() {
     }
 
     return (
-        <div >
+        <div>
             <div className='p-14 py-24 border 
             items-center flex 
             justify-center bg-secondary
@@ -60,13 +60,16 @@ function AddResume() {
                     <DialogHeader>
                         <DialogTitle>Create New Resume</DialogTitle>
                         <DialogDescription>
-                            <p>Add a title for your new resume</p>
-                            <Input className="my-2"
-                                placeholder="Ex.Full Stack resume"
+                            Add a title for your new resume
+                        </DialogDescription>
+                        <div className='mt-2'>
+                            <Input
+                                className="w-full"
+                                placeholder="Ex. Full Stack Resume"
                                 onChange={(e) => setResumeTitle(e.target.value)}
                             />
-                        </DialogDescription>
-                        <div className='flex justify-end gap-5'>
+                        </div>
+                        <div className='flex justify-end gap-5 mt-4'>
                             <Button onClick={() => setOpenDialog(false)} variant="ghost">Cancel</Button>
                             <Button
                                 disabled={!resumeTitle || loading}
@@ -80,7 +83,6 @@ function AddResume() {
                     </DialogHeader>
                 </DialogContent>
             </Dialog>
-
         </div>
     )
 }

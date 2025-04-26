@@ -6,162 +6,186 @@ import { ResumeInfoContext } from '@/context/ResumeInfoContext'
 import { useParams } from 'react-router-dom'
 import GlobalApi from './../../../../../service/GlobalApi'
 import { toast } from 'sonner'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, Plus } from 'lucide-react'
 
-const formField={
-    title:'',
-    companyName:'',
-    city:'',
-    state:'',
-    startDate:'',
-    endDate:'',
-    workSummery:'',
-
+const formField = {
+    title: '',
+    companyName: '',
+    city: '',
+    state: '',
+    startDate: '',
+    endDate: '',
+    workSummery: '',
 }
-function Experience() {
-    const [experinceList,setExperinceList]=useState([]);
-    const {resumeInfo,setResumeInfo}=useContext(ResumeInfoContext);
-    const params=useParams();
-    const [loading,setLoading]=useState(false);
 
-    useEffect(()=>{
-        resumeInfo?.Experience.length>0&&setExperinceList(resumeInfo?.Experience)
-        
-    },[])
+function Experience({enabledNext}) {
+    const [experienceList, setExperienceList] = useState([]);
+    const {resumeInfo, setResumeInfo} = useContext(ResumeInfoContext);
+    const params = useParams();
+    const [loading, setLoading] = useState(false);
 
-    const handleChange=(index,event)=>{
-        const newEntries=experinceList.slice();
-        const {name,value}=event.target;
-        newEntries[index][name]=value;
-        console.log(newEntries)
-        setExperinceList(newEntries);
-    }
+    useEffect(() => {
+        // Initialize with existing experience or empty array
+        setExperienceList(resumeInfo?.Experience || []);
+    }, [resumeInfo?.Experience]);
 
-    const AddNewExperience=()=>{
-    
-        setExperinceList([...experinceList,{
-            title:'',
-            companyName:'',
-            city:'',
-            state:'',
-            startDate:'',
-            endDate:'',
-            workSummery:'',
-        }])
-    }
-
-    const RemoveExperience=()=>{
-        setExperinceList(experinceList=>experinceList.slice(0,-1))
-    }
-
-    const handleRichTextEditor=(e,name,index)=>{
-        const newEntries=experinceList.slice();
-        newEntries[index][name]=e.target.value;
-       
-        setExperinceList(newEntries);
-    }
-
-    useEffect(()=>{
-        setResumeInfo({
-            ...resumeInfo,
-            Experience:experinceList
+    const handleChange = (index, event) => {
+        const {name, value} = event.target;
+        setExperienceList(prevList => {
+            const newList = [...prevList];
+            newList[index] = {
+                ...newList[index],
+                [name]: value
+            };
+            return newList;
         });
-     
-    },[experinceList]);
+    };
 
+    const addNewExperience = () => {
+        setExperienceList(prev => [...prev, {...formField}]);
+    };
 
-    const onSave=()=>{
-        setLoading(true)
-        const data={
-            data:{
-                Experience:experinceList.map(({ id, ...rest }) => rest)
-            }
+    const removeExperience = (index) => {
+        setExperienceList(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const onSave = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        
+        try {
+            await GlobalApi.UpdateResumeDetail(params?.resumeId, {
+                Experience: experienceList
+            });
+            
+            setResumeInfo(prev => ({
+                ...prev,
+                Experience: experienceList
+            }));
+            
+            enabledNext(true);
+            toast.success('Experience updated successfully');
+        } catch (error) {
+            console.error('Error updating experience:', error);
+            toast.error('Failed to update experience');
+        } finally {
+            setLoading(false);
         }
+    };
 
-         console.log(experinceList)
-
-        GlobalApi.UpdateResumeDetail(params?.resumeId,data).then(res=>{
-            console.log(res);
-            setLoading(false);
-            toast('Details updated !')
-        },(error)=>{
-            setLoading(false);
-        })
-
-    }
-  return (
-    <div>
+    return (
         <div className='p-5 shadow-lg rounded-lg border-t-primary border-t-4 mt-10'>
-        <h2 className='font-bold text-lg'>Professional Experience</h2>
-        <p>Add Your previous Job experience</p>
-        <div>
-            {experinceList.map((item,index)=>(
-                <div key={index}>
-                    <div className='grid grid-cols-2 gap-3 border p-3 my-5 rounded-lg'>
-                        <div>
-                            <label className='text-xs'>Position Title</label>
-                            <Input name="title" 
-                            onChange={(event)=>handleChange(index,event)}
-                            defaultValue={item?.title}
+            <div className='flex justify-between items-center'>
+                <div>
+                    <h2 className='font-bold text-lg'>Experience</h2>
+                    <span className='text-sm text-gray-500'>Add your work experience</span>
+                </div>
+                <Button
+                    variant="outline"
+                    onClick={addNewExperience}
+                    type="button"
+                    className="border-primary text-primary"
+                >
+                    <Plus className='h-4 w-4 mr-2' />
+                    Add Experience
+                </Button>
+            </div>
+
+            <form onSubmit={onSave}>
+                {experienceList.map((item, index) => (
+                    <div key={index} className='mt-5 border rounded-lg p-4'>
+                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                            <div>
+                                <label className='text-sm'>Job Title</label>
+                                <Input
+                                    name='title'
+                                    value={item.title}
+                                    onChange={(e) => handleChange(index, e)}
+                                    placeholder='Software Engineer'
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className='text-sm'>Company Name</label>
+                                <Input
+                                    name='companyName'
+                                    value={item.companyName}
+                                    onChange={(e) => handleChange(index, e)}
+                                    placeholder='Company Name'
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className='text-sm'>City</label>
+                                <Input
+                                    name='city'
+                                    value={item.city}
+                                    onChange={(e) => handleChange(index, e)}
+                                    placeholder='City'
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className='text-sm'>State</label>
+                                <Input
+                                    name='state'
+                                    value={item.state}
+                                    onChange={(e) => handleChange(index, e)}
+                                    placeholder='State'
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className='text-sm'>Start Date</label>
+                                <Input
+                                    type='date'
+                                    name='startDate'
+                                    value={item.startDate}
+                                    onChange={(e) => handleChange(index, e)}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className='text-sm'>End Date</label>
+                                <Input
+                                    type='date'
+                                    name='endDate'
+                                    value={item.endDate}
+                                    onChange={(e) => handleChange(index, e)}
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div className='mt-4'>
+                            <label className='text-sm'>Work Summary</label>
+                            <RichTextEditor
+                                value={item.workSummery}
+                                onChange={(value) => handleChange(index, {target: {name: 'workSummery', value}})}
                             />
                         </div>
-                        <div>
-                            <label className='text-xs'>Company Name</label>
-                            <Input name="companyName" 
-                            onChange={(event)=>handleChange(index,event)}
-                            defaultValue={item?.companyName} />
-                        </div>
-                        <div>
-                            <label className='text-xs'>City</label>
-                            <Input name="city" 
-                            onChange={(event)=>handleChange(index,event)} 
-                            defaultValue={item?.city}/>
-                        </div>
-                        <div>
-                            <label className='text-xs'>State</label>
-                            <Input name="state" 
-                            onChange={(event)=>handleChange(index,event)}
-                            defaultValue={item?.state}
-                             />
-                        </div>
-                        <div>
-                            <label className='text-xs'>Start Date</label>
-                            <Input type="date"  
-                            name="startDate" 
-                            onChange={(event)=>handleChange(index,event)} 
-                            defaultValue={item?.startDate}/>
-                        </div>
-                        <div>
-                            <label className='text-xs'>End Date</label>
-                            <Input type="date" name="endDate" 
-                            onChange={(event)=>handleChange(index,event)} 
-                            defaultValue={item?.endDate}
-                            />
-                        </div>
-                        <div className='col-span-2'>
-                           {/* Work Summery  */}
-                           <RichTextEditor
-                           index={index}
-                           defaultValue={item?.workSummery}
-                           onRichTextEditorChange={(event)=>handleRichTextEditor(event,'workSummery',index)}  />
+                        <div className='mt-4 flex justify-end'>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => removeExperience(index)}
+                            >
+                                Remove
+                            </Button>
                         </div>
                     </div>
-                </div>
-            ))}
-        </div>
-        <div className='flex justify-between'>
-            <div className='flex gap-2'>
-            <Button variant="outline" onClick={AddNewExperience} className="text-primary"> + Add More Experience</Button>
-            <Button variant="outline" onClick={RemoveExperience} className="text-primary"> - Remove</Button>
+                ))}
 
-            </div>
-            <Button disabled={loading} onClick={()=>onSave()}>
-            {loading?<LoaderCircle className='animate-spin' />:'Save'}    
-            </Button>
+                <div className='mt-5 flex justify-end'>
+                    <Button
+                        type="submit"
+                        disabled={loading || experienceList.length === 0}
+                    >
+                        {loading ? <LoaderCircle className='animate-spin mr-2' /> : 'Save & Continue'}
+                    </Button>
+                </div>
+            </form>
         </div>
-        </div>
-    </div>
-  )
+    );
 }
 
-export default Experience
+export default Experience;
