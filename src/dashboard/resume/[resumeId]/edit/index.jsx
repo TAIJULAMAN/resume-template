@@ -28,57 +28,83 @@ function EditResume() {
         try {
             const storedResume = localStorage.getItem(`resume-${resumeId}`);
             if (storedResume) {
-                setResumeInfo(JSON.parse(storedResume));
+                const parsedResume = JSON.parse(storedResume);
+                // Ensure proper data structure
+                const formattedResume = {
+                    id: parsedResume.id || resumeId,
+                    title: parsedResume.title || 'Untitled Resume',
+                    createdAt: parsedResume.createdAt || new Date().toISOString(),
+                    updatedAt: parsedResume.updatedAt || new Date().toISOString(),
+                    themeColor: parsedResume.themeColor || '#2563eb',
+                    content: {
+                        personalDetails: parsedResume.content?.personalDetails || {},
+                        summary: parsedResume.content?.summary || '',
+                        experience: parsedResume.content?.experience || [],
+                        education: parsedResume.content?.education || [],
+                        skills: parsedResume.content?.skills || []
+                    }
+                };
+                setResumeInfo(formattedResume);
                 setLoading(false);
                 return;
             }
-            const resume = GlobalApi.GetResumeById(resumeId);
-            if (!resume) {
-                toast.error('Resume not found');
-                navigate('/dashboard');
-                return;
-            }
-            setResumeInfo(resume);
+
+            // Create new resume if none exists
+            const newResume = {
+                id: resumeId,
+                title: 'Untitled Resume',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                themeColor: '#2563eb',
+                content: {
+                    personalDetails: {},
+                    summary: '',
+                    experience: [],
+                    education: [],
+                    skills: []
+                }
+            };
+            setResumeInfo(newResume);
+            localStorage.setItem(`resume-${resumeId}`, JSON.stringify(newResume));
         } catch (error) {
             console.error('Error fetching resume:', error);
             toast.error('Failed to load resume');
+            navigate('/dashboard');
         } finally {
             setLoading(false);
         }
     };
 
     const handleSave = useCallback(async (updatedInfo) => {
-        // Clear any pending save timeouts
         if (saveTimeout) clearTimeout(saveTimeout);
 
-        // Update state immediately for responsive UI
-        setResumeInfo(prevInfo => ({ ...prevInfo, ...updatedInfo }));
+        const newResumeInfo = {
+            ...resumeInfo,
+            ...updatedInfo,
+            updatedAt: new Date().toISOString()
+        };
+
+        // Update state immediately
+        setResumeInfo(newResumeInfo);
 
         // Debounce the save operation
-        const timeoutId = setTimeout(async () => {
+        const timeoutId = setTimeout(() => {
             try {
-                const finalUpdatedResume = {
-                    ...resumeInfo,
-                    ...updatedInfo,
-                    updatedAt: new Date().toISOString()
-                };
-
-                // Save to localStorage first (faster)
-                localStorage.setItem(`resume-${resumeId}`, JSON.stringify(finalUpdatedResume));
-
-                // Then update via API
-                await GlobalApi.UpdateResumeDetail(resumeId, finalUpdatedResume);
+                // Save to localStorage
+                localStorage.setItem(`resume-${resumeId}`, JSON.stringify(newResumeInfo));
+                // Optional: Save to backend if needed
+                // await GlobalApi.UpdateResumeDetail(resumeId, newResumeInfo);
             } catch (error) {
                 console.error('Error saving resume:', error);
                 toast.error('Failed to save changes');
             }
-        }, 1000); // Debounce for 1 second
+        }, 1000);
 
         setSaveTimeout(timeoutId);
     }, [resumeId, resumeInfo, saveTimeout]);
 
     const handleExport = async () => {
-        if (!previewRef.current) return;
+        if (!previewRef.current || !resumeInfo) return;
         try {
             await exportToPDF(previewRef.current, `${resumeInfo.title || 'resume'}.pdf`);
             toast.success('PDF exported successfully');
@@ -106,7 +132,7 @@ function EditResume() {
                 </div>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-10'>
                     <FormSection />
-                    <div ref={previewRef}>
+                    <div className="sticky top-4" ref={previewRef}>
                         <ResumePreview />
                     </div>
                 </div>
@@ -115,4 +141,4 @@ function EditResume() {
     );
 }
 
-export default EditResume
+export default EditResume;
