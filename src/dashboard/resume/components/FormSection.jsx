@@ -6,7 +6,7 @@ import Summery from './forms/Summery'
 import Experience from './forms/Experience'
 import Education from './forms/Education'
 import Skills from './forms/Skills'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ThemeColor from './ThemeColor'
 import { ResumeInfoContext } from '@/context/ResumeInfoContext'
 import { AIService } from '../../../../service/ai'
@@ -25,6 +25,34 @@ function FormSection() {
   const [enableNext, setEnableNext] = useState(true);
   const [isAILoading, setIsAILoading] = useState(false);
   const { resumeInfo, onSave } = useContext(ResumeInfoContext);
+  const navigate = useNavigate();
+
+  const handleFinish = useCallback(async () => {
+    try {
+      // Save any pending changes
+      if (resumeInfo) {
+        await onSave(resumeInfo);
+      }
+      // Navigate to dashboard
+      navigate('/dashboard');
+      toast.success('Resume saved successfully');
+    } catch (error) {
+      console.error('Error saving resume:', error);
+      toast.error('Failed to save resume');
+    }
+  }, [resumeInfo, onSave, navigate]);
+
+  const handleNext = useCallback(() => {
+    if (activeFormIndex === formSections.length) {
+      handleFinish();
+      return;
+    }
+    setActiveFormIndex(prev => prev < formSections.length ? prev + 1 : prev);
+  }, [activeFormIndex, handleFinish]);
+
+  const handleBack = useCallback(() => {
+    setActiveFormIndex(prev => prev > 1 ? prev - 1 : prev);
+  }, []);
 
   const handleAIEnhance = useCallback(async () => {
     if (!resumeInfo || !import.meta.env.VITE_OPENAI_API_KEY) {
@@ -38,32 +66,43 @@ function FormSection() {
 
       switch (activeFormIndex) {
         case 2: // Summary
+          if (!resumeInfo.content?.experience?.length && !resumeInfo.content?.skills?.length) {
+            toast.error('Please add some experience or skills first');
+            return;
+          }
           const summary = await AIService.generateSummary(
-            resumeInfo.content.experience,
-            resumeInfo.content.skills
+            resumeInfo.content?.experience || [],
+            resumeInfo.content?.skills || []
           );
           updatedContent = { content: { ...resumeInfo.content, summary } };
           break;
 
         case 3: // Experience
-          const lastExp = resumeInfo.content.experience[resumeInfo.content.experience.length - 1];
-          if (lastExp) {
-            const enhancedDesc = await AIService.enhanceJobDescription(lastExp.description);
-            const updatedExperience = resumeInfo.content.experience.map((exp, i) => 
-              i === resumeInfo.content.experience.length - 1 
-                ? { ...exp, description: enhancedDesc }
-                : exp
-            );
-            updatedContent = { content: { ...resumeInfo.content, experience: updatedExperience } };
+          const lastExp = resumeInfo.content?.experience?.[resumeInfo.content.experience.length - 1];
+          if (!lastExp?.description) {
+            toast.error('Please add a job description first');
+            return;
           }
+          const enhancedDesc = await AIService.enhanceJobDescription(lastExp.description);
+          const updatedExperience = resumeInfo.content.experience.map((exp, i) => 
+            i === resumeInfo.content.experience.length - 1 
+              ? { ...exp, description: enhancedDesc }
+              : exp
+          );
+          updatedContent = { content: { ...resumeInfo.content, experience: updatedExperience } };
           break;
 
         case 5: // Skills
+          if (!resumeInfo.content?.experience?.length) {
+            toast.error('Please add some experience first');
+            return;
+          }
           const suggestedSkills = await AIService.suggestSkills(
             resumeInfo.content.experience.map(exp => exp.description).join(' ')
           );
+          const currentSkills = resumeInfo.content?.skills || [];
           const newSkills = [...new Set([
-            ...resumeInfo.content.skills,
+            ...currentSkills,
             ...suggestedSkills.split(',').map(s => s.trim())
           ])];
           updatedContent = { content: { ...resumeInfo.content, skills: newSkills } };
@@ -104,7 +143,7 @@ function FormSection() {
               {isAILoading ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
               ) : (
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 mr-2" />
               )}
               Enhance with AI
             </Button>
@@ -113,18 +152,17 @@ function FormSection() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setActiveFormIndex(prev => prev - 1)}
+              onClick={handleBack}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
           )}
           <Button
             size="sm"
             disabled={!enableNext}
-            onClick={() => setActiveFormIndex(prev => 
-              prev < formSections.length ? prev + 1 : prev
-            )}
+            onClick={handleNext}
+            className={activeFormIndex === formSections.length ? 'bg-green-600 hover:bg-green-700' : ''}
           >
             {activeFormIndex === formSections.length ? 'Finish' : 'Next'}
             <ArrowRight className="w-4 h-4 ml-2" />
@@ -143,7 +181,7 @@ function FormSection() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
-export default FormSection
+export default FormSection;
